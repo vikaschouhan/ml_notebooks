@@ -5,6 +5,8 @@ from   io import StringIO, BytesIO, TextIOWrapper
 import zipfile, csv
 import subprocess
 import shlex
+import numpy as np
+import random
 from   .utils import *
 
 # NSE bhavcopy data
@@ -136,4 +138,56 @@ plot "-" using (strptime("%Y-%m-%d", strcol(1))):2:4:3:5:($5 < $2 ? -1 : 1) with
     if stderr:
         console_log(stderr)
     # endif
+# enddef
+
+# Generate training data from ticker
+def generate_training_data_from_ticker(df_t, out_dir, num_samples=200,
+        forward_period=4, backward_period=20, tick_name=None,
+        timeout=40):
+    mkdir(out_dir)
+    
+    tick_name = u4() if tick_name is None else tick_name
+    df_t['return'] = np.log(df_t['Close']) - np.log(df_t['Close'].shift())
+    df_t['cumret'] = df_t['return'].rolling(window=forward_period).sum().shift(-forward_period)
+    df_t.dropna(inplace=True)
+    sample_index_list = []
+    annot_dict = {}
+    tout_ctri = 0
+    for indx_t in range(num_samples):
+        if tout_ctri >= timeout:
+            break
+        # endif
+        tout_ctr   = 0
+        # Select starting index
+        while True:
+            if tout_ctr >= timeout:
+                break
+            # endif
+            start_indx = random.randint(backward_period, len(df_t)-1)
+            if start_indx in sample_index_list:
+                tout_ctr += 1
+                continue
+            # endif
+            break
+        # endwhile
+        if start_indx in sample_index_list:
+            tout_ctri += 1
+            continue
+        # endif
+        
+        # Append
+        sample_index_list.append(start_indx)
+        
+        # Generate data
+        cumret_t = df_t.iloc[start_indx]['cumret']
+        cumr_str = ('plus_{}'.format(cumret_t) if cumret_t > 0 else 'minus_{}'.format(abs(cumret_t))).replace('.', '')
+        img_out  = tick_name + '_' + str(indx_t) + '_' + str(start_indx) + \
+                       '_' + str(df_t.iloc[start_indx].name) + '_' + cumr_str + '.png'
+        img_out_abs = os.path.join(out_dir, img_out)
+        annot_dict[img_out] = df_t.iloc[start_indx]['cumret']
+        
+        generate_candlestick_figure(df_t.iloc[start_indx+1-backward_period:start_indx+1], img_out_abs,
+                                    col_map={'o':'Open', 'h':'High', 'l':'Low', 'c':'Close', 'v': 'Volume'})
+    # endfor
+    return annot_dict
 # enddef

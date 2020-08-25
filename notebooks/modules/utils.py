@@ -6,6 +6,7 @@ import logging
 import urllib3
 import subprocess
 import shlex
+import uuid
 
 # Disable pesky urllib3 warnings
 logging.getLogger(urllib3.__package__).setLevel(logging.ERROR)
@@ -95,4 +96,9 @@ def month_str(m_n):
     assert m_n <= 12 and m_n >= 1, "Month number should be between 1 & 12"
     m_str = [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
     return m_str[m_n-1]
+# enddef
+
+def u4(prefix=None):
+    u4_str = str(uuid.uuid4()) + '__' + str(uuid.uuid4())
+    return '{}__{}'.format(prefix, u4_str) if prefix else u4_str
 # enddef
