@@ -7,6 +7,10 @@ import urllib3
 import subprocess
 import shlex
 import uuid
+import joblib
+from   concurrent import futures
+from   functools import partial
+from   tqdm import tqdm
 
 # Disable pesky urllib3 warnings
 logging.getLogger(urllib3.__package__).setLevel(logging.ERROR)
@@ -101,4 +105,12 @@ def month_str(m_n):
 def u4(prefix=None):
     u4_str = str(uuid.uuid4()) + '__' + str(uuid.uuid4())
     return '{}__{}'.format(prefix, u4_str) if prefix else u4_str
+# enddef
+
+def spawn(fn_tor, iterator, n_jobs=4, *args, **kwargs):
+    exector  = futures.ProcessPoolExecutor(max_workers=n_jobs)
+    lmbda_fn = partial(fn_tor, *args, **kwargs) #lambda x: fn_tor(x, *args, **kwargs)
+    results  = exector.map(lmbda_fn, iterator)
+    rresults = list(tqdm(results, total=len(iterator)))
+    return rresults
 # enddef

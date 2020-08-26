@@ -153,6 +153,11 @@ def generate_training_data_from_ticker(df_t, out_dir, num_samples=200,
     sample_index_list = []
     annot_dict = {}
     tout_ctri = 0
+
+    if backward_period >= len(df_t)-1:
+        return {}
+    # endif
+
     for indx_t in range(num_samples):
         if tout_ctri >= timeout:
             break
