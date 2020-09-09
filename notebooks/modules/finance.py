@@ -7,6 +7,10 @@ import subprocess
 import shlex
 import numpy as np
 import random
+import mplfinance as mplf
+from   decimal import Decimal
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from   .utils import *
 
 # NSE bhavcopy data
@@ -92,58 +96,39 @@ def download_nse_daily_data(out_file, sym_list=None, start_date=None, end_date=N
     # endfor
 # enddef
 
+def format_price(x, _=None):
+    x = Decimal(x)
+    return x.quantize(Decimal(1)) if x == x.to_integral() else x.normalize()
+# enddef
+
 # Using Gnuplot
-def generate_candlestick_figure(df_t, out_file,
-        col_map={'o':'Open', 'h':'High', 'l':'Low', 'c':'Close', 'v': 'Volume'}):
-    date_l   = df_t.index.to_list()
-    open_l   = df_t[col_map['o']].to_list()
-    high_l   = df_t[col_map['h']].to_list()
-    low_l    = df_t[col_map['l']].to_list()
-    close_l  = df_t[col_map['c']].to_list()
-
-    file_ext = os.path.splitext(out_file)[1]
-    file_ext = file_ext[1:].lower() if file_ext[0] == '.' else 'png'
-    assert file_ext in ['png', 'jpg'], '{} should have a png or jpg file extension'.format(out_file)
-
-    gpl_txt  = '''
-reset
-set key off
-set obj 1 rectangle behind from screen 0,0 to screen 1,1
-set obj 1 fillstyle solid 1.0 fillcolor rgbcolor "black"
-
-set xdata time
-set timefmt "%Y-%m-%d"
-set datafile separator ","
-set palette defined (-1 'red', 1 'green')
-set cbrange [-1:1]
-unset colorbox
-set style fill solid noborder
-set boxwidth 30000 absolute
-set bars linecolor "white" linewidth 1
-set term {}
-set output "{}"
-
-plot "-" using (strptime("%Y-%m-%d", strcol(1))):2:4:3:5:($5 < $2 ? -1 : 1) with candlesticks palette'''.format(file_ext, out_file)
-
-    # Add rows
-    for i in range(len(date_l)):
-        gpl_txt += '\n{},{},{},{},{}'.format(date_l[i], open_l[i], high_l[i], low_l[i], close_l[i])
-    # endfor
-
-    proc = subprocess.Popen(['gnuplot'], shell=False, stdin=subprocess.PIPE)
-    proc.stdin.write(gpl_txt.encode('utf-8'))
-    stdout, stderr = proc.communicate()
-    if stdout:
-        console_log(stdout)
-    if stderr:
-        console_log(stderr)
+def generate_candlestick_figure(df, out_file, figratio=None, figscale=1.0):
+    df.index = pd.to_datetime(df.index)
+    # Generate log plot. Currently it's not supported by mplf.plot,
+    # so we do it overselves.
+    if figratio:
+        fig, axlist = mplf.plot(df, type='candle', returnfig=True, figratio=figratio, figscale=figscale)
+    else:
+        fig, axlist = mplf.plot(df, type='candle', returnfig=True, figscale=figscale)
     # endif
+    ax1 = axlist[0]
+    ax1_minor_yticks = ax1.get_yticks(True)  # save the original ticks because the log ticks are sparse
+    ax1_major_yticks = ax1.get_yticks(False)
+    ax1.set_yscale('log')
+    ax1.set_yticks(ax1_major_yticks, True)
+    ax1.set_yticks(ax1_minor_yticks, False)
+    ax1.yaxis.set_major_formatter(ticker.FuncFormatter(format_price))
+    ax1.yaxis.set_minor_formatter(ticker.FuncFormatter(format_price))
+    ax1.autoscale()
+    ax1.axis('off')
+    fig.savefig(out_file)
+    plt.close('all')
 # enddef
 
 # Generate training data from ticker
 def generate_training_data_from_ticker(df_t, out_dir, num_samples=200,
         forward_period=4, backward_period=20, tick_name=None,
-        timeout=40):
+        timeout=40, figratio=None, figscale=1.0):
     mkdir(out_dir)
     
     tick_name = u4() if tick_name is None else tick_name
@@ -192,7 +177,7 @@ def generate_training_data_from_ticker(df_t, out_dir, num_samples=200,
         annot_dict[img_out] = df_t.iloc[start_indx]['cumret']
         
         generate_candlestick_figure(df_t.iloc[start_indx+1-backward_period:start_indx+1], img_out_abs,
-                                    col_map={'o':'Open', 'h':'High', 'l':'Low', 'c':'Close', 'v': 'Volume'})
+                                    figratio=figratio, figscale=figscale)
     # endfor
     return annot_dict
 # enddef
