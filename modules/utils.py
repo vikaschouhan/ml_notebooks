@@ -1,4 +1,6 @@
 import os
+import shutil
+import sys
 import pandas as pd
 import pickle
 from   urllib.request import urlopen, Request
@@ -24,6 +26,15 @@ def mkdir(dir):
     # endif
     if not os.path.isdir(dir):
         os.makedirs(dir, exist_ok=True)
+    # endif
+# enddef
+
+def rmdir(dir):
+    if dir is None:
+        return None
+    # endif
+    if os.path.isdir(dir):
+        shutil.rmtree(dir)
     # endif
 # enddef
 

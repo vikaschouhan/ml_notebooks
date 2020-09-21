@@ -16,7 +16,7 @@ import shutil
 
 
 work_dir = 'out/direction_prediction_from_visual_patterns_notebook1__data'
-shutil.rmtree(work_dir)
+rmdir(work_dir)
 mkdir(work_dir)
 
 
