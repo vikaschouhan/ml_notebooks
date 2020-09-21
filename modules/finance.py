@@ -11,6 +11,7 @@ import mplfinance as mplf
 from   decimal import Decimal
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import PIL.Image
 from   .utils import *
 
 # NSE bhavcopy data
@@ -101,8 +102,9 @@ def format_price(x, _=None):
     return x.quantize(Decimal(1)) if x == x.to_integral() else x.normalize()
 # enddef
 
-# Using Gnuplot
-def generate_candlestick_figure(df, out_file, figratio=None, figscale=1.0):
+# Plot candlestick to out_file if out_file is not None,
+# else return a PIL instance for the image
+def generate_candlestick_figure(df, out_file=None, figratio=None, figscale=1.0, return_pil=False):
     df.index = pd.to_datetime(df.index)
     # Generate log plot. Currently it's not supported by mplf.plot,
     # so we do it overselves.
@@ -121,8 +123,17 @@ def generate_candlestick_figure(df, out_file, figratio=None, figscale=1.0):
     ax1.yaxis.set_minor_formatter(ticker.FuncFormatter(format_price))
     ax1.autoscale()
     ax1.axis('off')
-    fig.savefig(out_file)
+
+    buf = None
+    if out_file:
+        fig.savefig(out_file)
+    else:
+        buf = BytesIO()
+        fig.savefig(buf, format='png')
+        buf = PIL.Image.open(buf) if return_pil else buf
+    # endif
     plt.close('all')
+    return buf
 # enddef
 
 # Generate training data from ticker
@@ -180,4 +191,18 @@ def generate_training_data_from_ticker(df_t, out_dir, num_samples=200,
                                     figratio=figratio, figscale=figscale)
     # endfor
     return annot_dict
+# enddef
+
+# Generate training data from ticker
+def dframe_to_tfdata(df_t, forward_period=4, backward_period=20, figratio=None, figscale=1.0):
+    df_t['return'] = np.log(df_t['Close']) - np.log(df_t['Close'].shift())
+    df_t['cumret'] = df_t['return'].rolling(window=forward_period).sum().shift(-forward_period)
+    df_t.dropna(inplace=True)
+        
+    # Generate data
+    start_indx = random.randint(backward_period, len(df_t)-1)
+    cumret_t   = df_t.iloc[start_indx]['cumret']
+        
+    data = generate_candlestick_figure(df_t.iloc[start_indx+1-backward_period:start_indx+1], figratio=figratio, figscale=figscale)
+    return (data, cumret_t)
 # enddef
